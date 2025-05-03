@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment Gateway Demo</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+        color: #2c3e50;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .btn {
+        display: inline-block;
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 15px;
+        font-family: inherit;
+      }
+      .btn:hover {
+        background: #2980b9;
+      }
+      .btn:disabled {
+        background: #95a5a6;
+        cursor: not-allowed;
+      }
+      .payment-options {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+      }
+      .error {
+        color: red;
+        text-align: center;
+        margin-top: 10px;
+      }
+      .success {
+        color: green;
+        text-align: center;
+        margin-top: 10px;
+      }
+      .loading {
+        display: none;
+        text-align: center;
+        margin-top: 20px;
+      }
+      .loading.active {
+        display: block;
+      }
+      .spinner {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        border: 3px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top-color: #3498db;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
+        vertical-align: middle;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Payment Gateway Demo</h1>
+
+      <form id="payment-form">
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required />
+        </div>
+
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="text" id="phone" name="phone" />
+        </div>
+
+        <div class="form-group">
+          <label for="amount">Amount</label>
+          <input type="number" id="amount" name="amount" step="0.01" required />
+        </div>
+
+        <div class="form-group">
+          <label for="currency">Currency</label>
+          <select id="currency" name="currency">
+            <option value="SGD">SGD - Singapore Dollar</option>
+            <option value="MYR">MYR - Malaysian Ringgit</option>
+            <option value="USD">USD - US Dollar</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="reference">Reference</label>
+          <input type="text" id="reference" name="reference" required />
+        </div>
+
+        <div class="payment-options">
+          <button type="button" id="hitpay-btn" class="btn">
+            Pay with HitPay
+          </button>
+          <button type="button" id="chip-btn" class="btn">Pay with Chip</button>
+        </div>
+
+        <div id="loading" class="loading">
+          <div class="spinner"></div>
+          <span>Processing payment, please wait...</span>
+        </div>
+
+        <div id="payment-message" class=""></div>
+      </form>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // Generate a random reference number
+        document.getElementById("reference").value =
+          "ORDER-" + Math.floor(Math.random() * 1000000);
+
+        // Pre-fill form with sample data for testing
+        document.getElementById("name").value = "Test User";
+        document.getElementById("email").value = "test@example.com";
+        document.getElementById("phone").value = "+1234567890";
+        document.getElementById("amount").value = "10.00";
+
+        // Get UI elements
+        const hitpayBtn = document.getElementById("hitpay-btn");
+        const chipBtn = document.getElementById("chip-btn");
+        const loadingElement = document.getElementById("loading");
+
+        // Handle HitPay payment
+        hitpayBtn.addEventListener("click", async () => {
+          await processPayment("hitpay");
+        });
+
+        // Handle Chip payment
+        chipBtn.addEventListener("click", async () => {
+          await processPayment("chip");
+        });
+
+        async function processPayment(gateway) {
+          const messageElement = document.getElementById("payment-message");
+          messageElement.className = "";
+          messageElement.textContent = "";
+          
+          // Show loading indicator and disable buttons
+          loadingElement.classList.add("active");
+          hitpayBtn.disabled = true;
+          chipBtn.disabled = true;
+
+          // Validate form
+          const form = document.getElementById("payment-form");
+          if (!form.checkValidity()) {
+            form.reportValidity();
+            // Hide loading and re-enable buttons if validation fails
+            loadingElement.classList.remove("active");
+            hitpayBtn.disabled = false;
+            chipBtn.disabled = false;
+            return;
+          }
+
+          // Get form data
+          const paymentData = {
+            name: document.getElementById("name").value,
+            email: document.getElementById("email").value,
+            phone: document.getElementById("phone").value,
+            amount: parseFloat(document.getElementById("amount").value),
+            currency: document.getElementById("currency").value,
+            reference: document.getElementById("reference").value,
+            product: "Demo Product",
+          };
+
+          try {
+            // Send payment request
+            const response = await fetch(`/api/${gateway}/create-payment`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(paymentData),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              throw new Error(result.error || "Failed to create payment");
+            }
+
+            // Redirect to payment URL
+            if (gateway === "hitpay" && result.url) {
+              // Append gateway to URL as a query parameter if not already present
+              const url = new URL(result.url);
+              if (!url.searchParams.has("gateway")) {
+                url.searchParams.append("gateway", "hitpay");
+              }
+              window.location.href = url.toString();
+            } else if (gateway === "chip" && result.checkout_url) {
+              // Append gateway to URL as a query parameter if not already present
+              const url = new URL(result.checkout_url);
+              if (!url.searchParams.has("gateway")) {
+                url.searchParams.append("gateway", "chip");
+              }
+              window.location.href = url.toString();
+            } else {
+              throw new Error("No payment URL returned");
+            }
+          } catch (error) {
+            // Hide loading and re-enable buttons on error
+            loadingElement.classList.remove("active");
+            hitpayBtn.disabled = false;
+            chipBtn.disabled = false;
+            
+            messageElement.className = "error";
+            messageElement.textContent = error.message;
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
